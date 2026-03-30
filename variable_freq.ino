@@ -110,8 +110,13 @@ ISR(TIMER0_OVF_vect) {
      // Read the input pin and subtract the zero point
      int input_value = analogRead(INPUT_PIN) - ZERO_POINT;
 
-     // Write the input value to both PWM pins with different signs using XOR operation and bit masking
-     analogWrite(POS_PIN, input_value ^ ((input_value >> (PWM_RES - 1)) & ((1 << PWM_RES) - 1)));
-     analogWrite(NEG_PIN, input_value ^ (~((input_value >> (PWM_RES - 1)) & ((1 << PWM_RES) - 1))));
+     // Write the input value to both PWM pins with different signs
+     if (input_value > 0) {
+       OCR1B = input_value;
+       OCR1A = 0;
+     } else {
+       OCR1A = -input_value;
+       OCR1B = 0;
+     }
    }
 }

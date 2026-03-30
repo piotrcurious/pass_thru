@@ -30,28 +30,35 @@ void setup() {
   pinMode(KNOB_IN, INPUT);
 
   // Set the PWM mode to fast and fixed frequency with 9-bit resolution
-  TCCR1A = (1 << WGM10) | (1 << COM1A1) | (1 << COM1B1); // Fast PWM, non-inverting mode for both channels
-  TCCR1B = (1 << WGM12) | (1 << CS10); // Fast PWM, no prescaler
+  TCCR1A = (1 << WGM11) | (1 << WGM10) | (1 << COM1A1) | (1 << COM1B1); // Fast PWM, non-inverting mode for both channels
+  TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10); // Fast PWM, no prescaler
+  ICR1 = (1 << PWM_RES) - 1;
 }
 
 void loop() {
   // Read the knob value and map it to the sampling period range
   int knob = analogRead(KNOB_IN);
   int period = map(knob, 0, 1023, MIN_PERIOD, 1000000);
+  if (knob == 0) period = 1000000;
 
   // Check if it is time to sample the analog input using a static variable
-  static unsigned int timer = micros();
-  if (micros() - timer >= period) {
+  static unsigned long timer = 0;
+  if (micros() - timer >= (unsigned long)period) {
     // Update the timer variable
     timer += period;
 
     // Read the analog input value and map it to the PWM range
     int analog = analogRead(ANALOG_IN);
-    int pwm = map(analog, 0, 1023, -(1 << (PWM_RES - 1)), (1 << (PWM_RES - 1)) - 1);
+    int pwm = map(analog, 0, 1023, -(1 << (PWM_RES - 1)), (1 << (PWM_RES - 1)));
 
     // Write the PWM values to the output pins using a ternary operator
-    analogWrite(PWM_POS, pwm > 0 ? pwm : 0);
-    analogWrite(PWM_NEG, pwm < 0 ? -pwm : 0);
+    if (pwm > 0) {
+      OCR1A = pwm;
+      OCR1B = 0;
+    } else {
+      OCR1B = -pwm;
+      OCR1A = 0;
+    }
     
     // End of sampling code block
     }
