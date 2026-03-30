@@ -21,10 +21,10 @@
 #define MIN_PERIOD 976 // microseconds
 
 // Define a variable to store the current sampling period
-unsigned int period;
+unsigned long period;
 
 // Define a variable to store the timer overflow count
-unsigned int timer;
+unsigned long timer;
 
 void setup() {
   // Set the PWM output pins as outputs
@@ -36,24 +36,25 @@ void setup() {
   pinMode(KNOB_IN, INPUT);
 
   // Set the PWM mode to fast and fixed frequency with 9-bit resolution
-  TCCR1A = (1 << WGM10) | (1 << COM1A1) | (1 << COM1B1); // Fast PWM, non-inverting mode for both channels
-  TCCR1B = (1 << WGM12) | (1 << CS10); // Fast PWM, no prescaler
+  TCCR1A = (1 << WGM11) | (1 << WGM10) | (1 << COM1A1) | (1 << COM1B1); // Fast PWM, non-inverting mode for both channels
+  TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10); // Fast PWM, no prescaler
+  ICR1 = (1 << PWM_RES) - 1;
 
   // Initialize the sampling period and timer variables
   period = MIN_PERIOD;
-  timer = micros();
+  timer = 0;
 }
 
 void loop() {
   // Read the knob value and map it to the sampling frequency range
   int knob = analogRead(KNOB_IN);
-  int freq = map(knob, 0, 1023, 0, MAX_FREQ);
+  int freq = map(knob, 0, 1023, 1, MAX_FREQ);
 
   // Calculate the sampling period from the frequency
   period = constrain(1000000 / freq, MIN_PERIOD, 1000000);
 
   // Check if it is time to sample the analog input
-  if (micros() - timer >= period) {
+  if (micros() - timer >= (unsigned long)period) {
     // Update the timer variable
     timer += period;
 
@@ -66,8 +67,8 @@ void loop() {
     int pwm_neg = pwm < (1 << (PWM_RES - 1)) ? (1 << (PWM_RES - 1)) - pwm : 0;
 
     // Write the PWM values to the output pins
-    analogWrite(PWM_POS, pwm_pos);
-    analogWrite(PWM_NEG, pwm_neg);
+    OCR1B = pwm_pos;
+    OCR1A = pwm_neg;
     
     // End of sampling code block
     }

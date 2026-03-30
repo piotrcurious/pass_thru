@@ -30,9 +30,11 @@ void setup() {
   ICR1 = 1023;
 
   // Initialize last_time with period
-  static unsigned long last_time; // variable to store the last time of sampling
-  last_time = micros() + period; // set last_time to current time plus period
+  static unsigned long last_time_init; // variable to store the last time of sampling
+  last_time_init = micros() + period; // set last_time to current time plus period
 }
+
+static unsigned long last_time;
 
 void loop() {
   // Read the knob value and map it to sampling frequency range
@@ -40,7 +42,8 @@ void loop() {
   freq = map(knob, 0, 1023, 0, 1024); // map knob value to frequency from 0 to 1024 Hz
 
   // Calculate the sampling period in microseconds
-  period = 1000000UL / freq; // divide one second by frequency
+  if (freq == 0) period = 1000000UL;
+  else period = 1000000UL / freq; // divide one second by frequency
 
   // Read the analog input value and map it to PWM duty cycle range
   int analog_in = analogRead(ANALOG_IN); // read analog input value from 0 to 1023

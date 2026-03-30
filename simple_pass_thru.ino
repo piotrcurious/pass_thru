@@ -14,8 +14,8 @@ volatile uint32_t samplingFrequency; // Sampling frequency in Hz
 volatile uint32_t samplingPeriod; // Sampling period in timer ticks
 
 // Define variables for zero-error timing algorithm
-volatile uint32_t bres; // Bresenham variable for zero-error timing
-volatile uint32_t bres_; // Bresenham constant for zero-error timing
+volatile int32_t bres; // Bresenham variable for zero-error timing
+volatile int32_t bres_; // Bresenham constant for zero-error timing
 
 // Define variables for analog input and output values
 volatile uint16_t analogInput; // Analog input value from A0
@@ -30,8 +30,8 @@ void setup() {
 
   // Set timer1 for fast PWM mode with ICR1 as top value
   TCCR1A = (1 << WGM11) | (1 << COM1A1); // Clear OC1A on compare match, set at bottom
-  TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS11) | (1 << CS10); // Fast PWM mode, prescaler 64
-  ICR1 = F_CPU / (TIMER_PRESCALER * PWM_FREQUENCY) - 1; // Set top value for PWM frequency
+  TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10); // Fast PWM mode, no prescaler
+  ICR1 = PWM_RESOLUTION - 1; // Set top value for 10 bit resolution
 
   // Set timer2 for normal mode with overflow interrupt enabled
   TCCR2A = 0; // Normal mode
@@ -39,11 +39,12 @@ void setup() {
   TIMSK2 = (1 << TOIE2); // Enable overflow interrupt
 
   // Initialize sampling frequency and period variables
-  samplingFrequency = map(analogRead(A1), 0, 1023, 0, 1024); // Read A1 and map it to sampling frequency range
+  int a1_val = analogRead(A1);
+  samplingFrequency = map(a1_val, 0, 1023, 1, 1024); // Read A1 and map it to sampling frequency range (min 1Hz)
   samplingPeriod = F_CPU / (TIMER_PRESCALER * samplingFrequency); // Calculate sampling period in timer ticks
 
   // Initialize bresenham variables for zero-error timing algorithm
-  bres = samplingPeriod; // Set initial bresenham variable to sampling period
+  bres = 0; // Trigger first sample immediately
   bres_ = samplingPeriod; // Set bresenham constant to sampling period
 
 }
@@ -59,7 +60,7 @@ ISR(TIMER2_OVF_vect) {
   bres -= 256;
 
   // Check if bresenham variable is less than zero
-  if (bres < 0) {
+  if (bres <= 0) {
     // Sample analog input from A0 and map it to PWM resolution range
     analogInput = analogRead(A0);
     analogOutput = map(analogInput, 0, 1023, 0, PWM_RESOLUTION - 1);
@@ -71,7 +72,8 @@ ISR(TIMER2_OVF_vect) {
     bres += bres_;
     
     // Update sampling frequency and period variables based on A1 input
-    samplingFrequency = map(analogRead(A1), 0, 1023, 0, 1024); // Read A1 and map it to sampling frequency range
+    int a1_val_isr = analogRead(A1);
+    samplingFrequency = map(a1_val_isr, 0, 1023, 1, 1024); // Read A1 and map it to sampling frequency range (min 1Hz)
     samplingPeriod = F_CPU / (TIMER_PRESCALER * samplingFrequency); // Calculate sampling period in timer ticks
     
     // Update bresenham constant based on new sampling period
