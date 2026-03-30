@@ -42,7 +42,7 @@ volatile byte prescaler_bits = CS01_BIT;
 // Define a function to set the timer0 prescaler based on the sampling frequency
 void set_prescaler() {
   // Calculate the number of timer0 ticks per sample
-  int ticks_per_sample = F_CPU / (sampling_freq);
+  uint32_t ticks_per_sample = F_CPU / (sampling_freq);
   
   // Choose the smallest prescaler that can fit the ticks per sample in one byte
   if (ticks_per_sample <= 256) {
@@ -78,7 +78,7 @@ void set_prescaler() {
 void set_overflow_count() {
   
    // Calculate the number of timer0 ticks per sample with the chosen prescaler 
-   int ticks_per_sample = F_CPU / (prescaler_value * sampling_freq); 
+   uint32_t ticks_per_sample = F_CPU / ((uint32_t)prescaler_value * (uint32_t)sampling_freq);
    
    // Calculate the number of timer0 overflows per sample 
    int overflows_per_sample = ticks_per_sample / 256; 
@@ -103,19 +103,16 @@ void read_and_output() {
    // Subtract the zero point from the input value 
    input_value -= ANALOG_ZERO; 
    
-   // Determine the sign of the input value 
-   bool sign = input_value >= 0; 
-   
    // Output the PWM signals to pins 9 and 10 based on the sign 
-   if (sign) { 
+   if (input_value >= 0) {
       // Output the positive value to pin 10 and zero to pin 9 
-      OCR1B = input_value; 
-      OCR1A = 0; 
+      OCR1A = input_value;
+      OCR1B = 0;
       
       } else { 
       // Output the inverted negative value to pin 9 and zero to pin 10 
-      OCR1A = -input_value; 
-      OCR1B = 0; 
+      OCR1B = -input_value;
+      OCR1A = 0;
       
       }
 }

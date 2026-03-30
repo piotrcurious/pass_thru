@@ -2,6 +2,7 @@ import ctypes
 import os
 import subprocess
 import numpy as np
+import matplotlib.pyplot as plt
 
 class ArduinoSimulator:
     def __init__(self, ino_path):
@@ -75,8 +76,9 @@ class ArduinoSimulator:
             # Simulate timer overflows
             # Timer2 and Timer0 often use 64 prescaler -> 1024us per overflow
             # We call them every 1024 us.
-            if t_int > 0 and t_int % 1024 == 0:
+            if t_int % 1024 == 0:
                  self.sim_timer2_ovf()
+            if t_int % 256 == 0:
                  self.sim_timer0_ovf()
 
             # Additional calls for files that might expect more frequent interrupts
@@ -92,6 +94,38 @@ class ArduinoSimulator:
             icr1_values.append(self.sim_get_ICR1())
 
         return time_points, ocr1a_values, ocr1b_values, icr1_values
+
+def run_transfer_function(filename, knob_val=512):
+    print(f"Calculating Transfer Function for {filename}...")
+    sim = ArduinoSimulator(filename)
+
+    frequencies = np.logspace(1, 3.5, 20) # 10Hz to ~3.16kHz
+    gains = []
+
+    for freq in frequencies:
+        # Run simulation for enough cycles
+        duration = int(max(20000, 2e6 / freq))
+        t, o1a, o1b, icr1 = sim.run_simulation(duration, input_freq=freq, knob_val=knob_val)
+
+        # Calculate output signal (differential for Class D, or single ended)
+        # We'll use OCR1A - OCR1B as a proxy for the output voltage
+        output = np.array(o1a) - np.array(o1b)
+
+        # Measure amplitude (RMS or peak-to-peak)
+        # Skip initial transients
+        skip = len(output) // 2
+        if len(output[skip:]) == 0:
+            gains.append(-100)
+            continue
+
+        peak_to_peak = np.ptp(output[skip:])
+        if peak_to_peak == 0:
+            gains.append(-100)
+        else:
+            gain_db = 20 * np.log10(peak_to_peak / 1024.0) # Normalized to 10-bit input
+            gains.append(gain_db)
+
+    return frequencies, gains
 
 def test_file(filename, knob_val=512):
     print(f"Testing {filename}...")
@@ -110,8 +144,20 @@ if __name__ == "__main__":
         "variable_freq.ino",
         "variable_freq_DC.ino"
     ]
+    plt.figure(figsize=(10, 6))
     for f in files:
         try:
             test_file(f)
+            freqs, gains = run_transfer_function(f)
+            plt.semilogx(freqs, gains, label=f)
         except Exception as e:
-            print(f"Failed to test {f}: {e}")
+            print(f"Failed to process {f}: {e}")
+
+    plt.grid(True, which="both", ls="-", alpha=0.5)
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Gain (dB)")
+    plt.title("Transfer Functions of Arduino Pass-Thru Implementations")
+    plt.legend()
+    plt.ylim([-40, 5])
+    plt.savefig("transfer_function.png")
+    print("Saved transfer_function.png")

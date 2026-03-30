@@ -38,11 +38,12 @@ void setup() {
 void loop() {
   // Read the knob value and map it to the sampling period range
   int knob = analogRead(KNOB_IN);
-  int period = map(knob, 0, 1023, MIN_PERIOD, 1000000);
+  unsigned long period = map(knob, 0, 1023, MIN_PERIOD, 1000000);
   if (knob == 0) period = 1000000;
 
   // Check if it is time to sample the analog input using a static variable
   static unsigned long timer = 0;
+  if (timer == 0) { timer = micros(); return; }
   if (micros() - timer >= (unsigned long)period) {
     // Update the timer variable
     timer += period;

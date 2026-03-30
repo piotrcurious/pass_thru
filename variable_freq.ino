@@ -24,17 +24,17 @@
 // Define the timer prescaler value (1, 8, 64, 256 or 1024)
 #define PRESCALER_VALUE 64
 
-// Define the timer prescaler bits (00, 01, 10 or 11)
+// Define the timer prescaler bits
 #if PRESCALER_VALUE == 1
-#define PRESCALER_BITS B00
+#define PRESCALER_BITS (1 << CS00)
 #elif PRESCALER_VALUE == 8
-#define PRESCALER_BITS B01
+#define PRESCALER_BITS (1 << CS01)
 #elif PRESCALER_VALUE == 64
-#define PRESCALER_BITS B10
+#define PRESCALER_BITS ((1 << CS01) | (1 << CS00))
 #elif PRESCALER_VALUE == 256
-#define PRESCALER_BITS B11
+#define PRESCALER_BITS (1 << CS02)
 #elif PRESCALER_VALUE == 1024
-#define PRESCALER_BITS B100
+#define PRESCALER_BITS ((1 << CS02) | (1 << CS00))
 #else
 #error Invalid prescaler value
 #endif
@@ -46,10 +46,10 @@
 volatile int sampling_freq = MIN_FREQ;
 
 // Define the sampling period variable
-volatile int sampling_period = 0;
+volatile uint32_t sampling_period = 0;
 
 // Define the timer counter variable
-volatile int timer_count = 0;
+volatile uint32_t timer_count = 0;
 
 void setup() {
   // Set the PWM pins as outputs
@@ -74,12 +74,14 @@ void setup() {
 
   // Calculate the initial sampling period
   sampling_period = F_CPU / (PRESCALER_VALUE * sampling_freq);
+  timer_count = sampling_period; // Trigger immediately
 }
 
 void loop() {
   // Read the frequency pin and map it to the frequency range
   int freq_value = analogRead(FREQ_PIN);
   int new_freq = map(freq_value, MIN_ANALOG, MAX_ANALOG, MIN_FREQ, MAX_FREQ);
+  if (new_freq < MIN_FREQ) new_freq = MIN_FREQ;
 
   // Gradually shift the sampling frequency to avoid glitches
   if (new_freq > sampling_freq) {

@@ -21,7 +21,7 @@
 #define MIN_PERIOD 976 // microseconds
 
 // Define a variable to store the current sampling period
-unsigned int period;
+unsigned long period;
 
 // Define a variable to store the timer overflow count
 unsigned long timer;
