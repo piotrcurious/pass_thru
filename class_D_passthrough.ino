@@ -58,17 +58,18 @@ void loop() {
     // Update the timer variable
     timer += period;
 
-    // Read the analog input value and map it to the PWM range
+    // Read the analog input value and center it
     int analog = analogRead(ANALOG_IN);
-    int pwm = map(analog, 0, 1023, 0, (1 << PWM_RES) - 1);
+    int diff = analog - 512; // Range -512 to 511
 
-    // Split the PWM value into positive and negative parts
-    int pwm_pos = pwm > (1 << (PWM_RES - 1)) ? pwm - (1 << (PWM_RES - 1)) : 0;
-    int pwm_neg = pwm < (1 << (PWM_RES - 1)) ? (1 << (PWM_RES - 1)) - pwm : 0;
-
-    // Write the PWM values to the output pins
-    OCR1B = pwm_pos;
-    OCR1A = pwm_neg;
+    // Split into positive and negative parts for full-scale output (0dB gain)
+    if (diff > 0) {
+      OCR1B = diff;
+      OCR1A = 0;
+    } else {
+      OCR1B = 0;
+      OCR1A = -diff;
+    }
     
     // End of sampling code block
     }

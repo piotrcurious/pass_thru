@@ -8,15 +8,11 @@
 #define ANALOG_IN A0 // analog input pin for sampling
 #define ANALOG_OUT 9 // PWM output pin
 #define KNOB A1 // analog input pin for knob
-#define TCCR1A _SFR_IO8(0x2F) // Timer/Counter1 Control Register A
-#define TCCR1B _SFR_IO8(0x30) // Timer/Counter1 Control Register B
-#define OCR1A _SFR_IO16(0x2A) // Output Compare Register 1 A
-#define OCR1B _SFR_IO16(0x28) // Output Compare Register 1 B
-#define ICR1 _SFR_IO16(0x26) // Input Capture Register 1
 
 // Define variables for sampling frequency and period
 int freq; // sampling frequency in Hz
 unsigned long period; // sampling period in microseconds
+static unsigned long last_time;
 
 void setup() {
   // Set PWM output pin as output
@@ -24,17 +20,14 @@ void setup() {
 
   // Set timer 1 to fast PWM mode with ICR1 as top value
   TCCR1A = (1 << WGM11) | (1 << COM1A1); // clear OC1A on compare match, set at bottom
-  TCCR1B = (1 << WGM13) | (1 << WGM12); // fast PWM mode, no prescaler
+  TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10); // fast PWM mode, no prescaler
 
   // Set ICR1 to 1023 for 10 bit resolution
   ICR1 = 1023;
 
-  // Initialize last_time with period
-  static unsigned long last_time_init; // variable to store the last time of sampling
-  last_time_init = micros() + period; // set last_time to current time plus period
+  // Initialize last_time
+  last_time = micros();
 }
-
-static unsigned long last_time;
 
 void loop() {
   // Read the knob value and map it to sampling frequency range
