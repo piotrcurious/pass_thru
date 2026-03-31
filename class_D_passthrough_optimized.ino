@@ -30,36 +30,41 @@ void setup() {
   pinMode(KNOB_IN, INPUT);
 
   // Set the PWM mode to fast and fixed frequency with 9-bit resolution
-  TCCR1A = (1 << WGM11) | (1 << WGM10) | (1 << COM1A1) | (1 << COM1B1); // Fast PWM, non-inverting mode for both channels
+  // Mode 14: Fast PWM with ICR1 as TOP
+  TCCR1A = (1 << WGM11) | (1 << COM1A1) | (1 << COM1B1); // Non-inverting mode for both channels
   TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10); // Fast PWM, no prescaler
   ICR1 = (1 << PWM_RES) - 1;
 }
 
 void loop() {
-  // Read the knob value and map it to the sampling period range
-  int knob = analogRead(KNOB_IN);
-  unsigned long period = map(knob, 0, 1023, MIN_PERIOD, 1000000);
-  if (knob == 0) period = 1000000;
+  // Read the knob value and map it to the sampling frequency range
+  int knob_val = analogRead(KNOB_IN);
+  int freq = map(knob_val, 0, 1023, 1, MAX_FREQ);
+
+  // Calculate the sampling period from the frequency
+  unsigned long sampling_period = 1000000UL / freq;
 
   // Check if it is time to sample the analog input using a static variable
-  static unsigned long timer = 0;
-  if (timer == 0) { timer = micros(); return; }
-  if (micros() - timer >= (unsigned long)period) {
+  static unsigned long last_sample_time = 0;
+  unsigned long now = micros();
+
+  if (last_sample_time == 0) { last_sample_time = now; if (last_sample_time == 0) last_sample_time = 1; }
+
+  if (now - last_sample_time >= sampling_period) {
     // Update the timer variable
-    timer += period;
+    last_sample_time += sampling_period;
 
     // Read the analog input value and map it to the PWM range
     int analog = analogRead(ANALOG_IN);
-    int pwm = map(analog, 0, 1023, -(1 << (PWM_RES - 1)), (1 << (PWM_RES - 1)));
+    int pwm = map(analog, 0, 1023, 0, (1 << PWM_RES) - 1);
 
-    // Write the PWM values to the output pins using a ternary operator
-    if (pwm > 0) {
-      OCR1A = pwm;
-      OCR1B = 0;
-    } else {
-      OCR1B = -pwm;
-      OCR1A = 0;
-    }
+    // Split the PWM value into positive and negative parts
+    int pwm_pos = pwm > (1 << (PWM_RES - 1)) ? pwm - (1 << (PWM_RES - 1)) : 0;
+    int pwm_neg = pwm < (1 << (PWM_RES - 1)) ? (1 << (PWM_RES - 1)) - pwm : 0;
+
+    // Write the PWM values to the output pins
+    OCR1A = pwm_pos;
+    OCR1B = pwm_neg;
     
     // End of sampling code block
     }
