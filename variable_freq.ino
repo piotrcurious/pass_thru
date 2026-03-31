@@ -83,17 +83,10 @@ void loop() {
   int new_freq = map(freq_value, MIN_ANALOG, MAX_ANALOG, MIN_FREQ, MAX_FREQ);
   if (new_freq < MIN_FREQ) new_freq = MIN_FREQ;
 
-  // Gradually shift the sampling frequency to avoid glitches
-  if (new_freq > sampling_freq) {
-    sampling_freq++;
+  // Update the sampling frequency immediately
+  if (new_freq != sampling_freq) {
+    sampling_freq = new_freq;
     sampling_period = F_CPU / (PRESCALER_VALUE * sampling_freq);
-    delay(10);
-  }
-  
-  if (new_freq < sampling_freq) {
-    sampling_freq--;
-    sampling_period = F_CPU / (PRESCALER_VALUE * sampling_freq);
-    delay(10);
   }
 }
 
