@@ -44,7 +44,7 @@ void setup() {
   samplingPeriod = F_CPU / (TIMER_PRESCALER * samplingFrequency); // Calculate sampling period in timer ticks
 
   // Initialize bresenham variables for zero-error timing algorithm
-  bres = samplingPeriod; // Wait for first sample period
+  bres = 0; // Trigger first sample immediately
   bres_ = samplingPeriod; // Set bresenham constant to sampling period
 
 }

@@ -71,7 +71,7 @@ void set_prescaler() {
     prescaler_bits = CS02_BIT | CS00_BIT;
     
     }
-  
+  TCCR0B = prescaler_bits;
 }
 
 // Define a function to set the timer0 overflow count based on the sampling frequency and prescaler

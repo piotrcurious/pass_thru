@@ -40,7 +40,7 @@ class ArduinoSimulator:
             f.write(ino_content)
 
         subprocess.run([
-            "g++", "-shared", "-fPIC", "-o", self.lib_path,
+            "g++", "-O3", "-shared", "-fPIC", "-o", self.lib_path,
             cpp_path, "mock_arduino/Arduino.cpp", "-I."
         ], check=True)
         os.remove(cpp_path)
@@ -62,61 +62,83 @@ def run_transfer_function(filename, knob_val=1023):
     print(f"Calculating Transfer Function for {filename}...")
     sim = ArduinoSimulator(filename)
 
-    # Sweep up to 3kHz
-    frequencies = np.logspace(1, 3.4, 10)
+    # Sweep from 10Hz to 2.5kHz
+    frequencies = np.logspace(1, 3.4, 25)
     gains = []
 
+    # Heuristic to detect output type
+    is_differential = "class_D" in filename or "variable_freq" in filename
+
     for freq in frequencies:
-        # Run for 4 cycles
-        duration = int(max(400000, 8e6 / freq))
-        t, o1a, o1b, icr1 = sim.run_simulation(duration, dt_us=500, input_freq=freq, knob_val=1023)
+        # Capture at least 10 cycles, but at least 400ms (to stabilize)
+        # 10 cycles at 10Hz = 1s.
+        duration = int(max(400000, 10e6 / freq))
 
-        # Differential for Class D
-        output = o1a.astype(float) - o1b.astype(float)
+        # Sampling at 20kHz (dt_us=50) to avoid aliasing up to 10kHz
+        # Though our frequencies only go to 2.5kHz.
+        dt_us = 50
 
-        # Skip initial transients
-        skip = len(output) // 2
+        t, o1a, o1b, icr1 = sim.run_simulation(duration, dt_us=dt_us, input_freq=freq, knob_val=knob_val)
+
+        if is_differential:
+            output = o1a.astype(float) - o1b.astype(float)
+        else:
+            output = o1a.astype(float) - 511.5
+
+        # Remove DC offset to be safe
+        output -= np.mean(output)
+
+        # Cross-correlation magnitude extraction
+        # Skip the first 30% of simulation for settling
+        skip = int(len(output) * 0.3)
         sig = output[skip:]
         t_sig = t[skip:]
 
-        if len(sig) < 10:
+        if len(sig) < 20:
             gains.append(-100)
             continue
 
         ref_cos = np.cos(2 * np.pi * freq * t_sig / 1e6)
         ref_sin = np.sin(2 * np.pi * freq * t_sig / 1e6)
 
+        # Quadrature detection to get amplitude regardless of phase
         a = np.mean(sig * ref_cos) * 2
         b = np.mean(sig * ref_sin) * 2
         amplitude = np.sqrt(a**2 + b**2)
 
-        input_amplitude = 511.0
+        input_amplitude = 511.0 # Input is +/- 511
 
         if amplitude <= 1e-3:
             gains.append(-100)
         else:
-            gains.append(20 * np.log10(amplitude / input_amplitude))
+            gain_db = 20 * np.log10(amplitude / input_amplitude)
+            gains.append(gain_db)
 
     return frequencies, gains
 
 if __name__ == "__main__":
     files = [
         "simple_pass_thru.ino",
+        "class_D_passthrough.ino",
         "class_D_passthrough_optimized.ino",
+        "class_D_passthrough_optimized3.ino",
         "variable_freq.ino",
+        "variable_freq_DC.ino"
     ]
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(12, 8))
     for f in files:
         try:
             freqs, gains = run_transfer_function(f, knob_val=1023)
-            plt.semilogx(freqs, gains, label=f, marker='o', markersize=4)
+            plt.semilogx(freqs, gains, label=f, marker='o', markersize=3, alpha=0.8)
         except Exception as e:
             print(f"Failed to process {f}: {e}")
+            import traceback
+            traceback.print_exc()
 
-    plt.grid(True, which="both", ls="-", alpha=0.5)
+    plt.grid(True, which="both", ls="-", alpha=0.3)
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Gain (dB)")
-    plt.title("Arduino Pass-Thru Frequency Response (Sampling @ ~1kHz)")
+    plt.title("Frequency Response Comparison (High Resolution)")
     plt.legend()
     plt.ylim([-40, 5])
     plt.savefig("transfer_function.png")
